@@ -11,6 +11,9 @@ from accounts.models import CustomUser
 
 # Create your views here.
 
+def editor(request):
+    return render(request, 'workflow/execute.html', {})
+
 def create_document_type(request, *args, **kwargs):
 	try:
 		body = json.loads(request.body)
@@ -44,12 +47,22 @@ def create_document_type(request, *args, **kwargs):
 			s.save()
 			externalWF.steps.add(s)
 
-
-
 	obj = DocumentType(title=body['title'], internal_work_flow=internalWF, external_work_flow=externalWF )
 	obj.save()
 
-	return JsonResponse({'id': obj.id, 'title': obj.title })
+	if obj.internal_work_flow :
+	    internalWF = {
+	        'title': obj.internal_work_flow.title ,
+	        'steps': [{ 'name': step.name, 'authority':step.authority.username} for step in obj.internal_work_flow.steps.all()],
+	        }
+
+	if obj.external_work_flow :
+	    externalWF = {
+	        'title': obj.external_work_flow.title,
+	        'steps': [{ 'name': step.name, 'authority':step.authority.username} for step in obj.external_work_flow.steps.all()],
+	        }
+
+	return JsonResponse({'id': obj.id, 'title': obj.title, 'internal_work_flow': internalWF, 'external_work_flow': externalWF })
 
 
 def getDocumentTypeObject(request, *args, **kwargs):
@@ -78,13 +91,104 @@ def getDocumentTypeObject(request, *args, **kwargs):
     })
 
 
+
+class WorkFlowListView(ListView):
+    template_name = 'workflow/workflow_list.html'
+
+    def get_queryset(self, **kwargs):
+        if self.request.user.is_staff :
+            return DocumentType.objects.all()
+        else:
+            return DocumentType.objects.none()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user_list = CustomUser.objects.all()
+
+        context['user_list'] = user_list
+        context['workflow'] = ['internal', 'external']
+        return context
+
+
+def workflow_delete_view(request, *args, **kwargs):
+    try:
+        body = json.loads(request.body)
+    except:
+        body = None
+
+    if body['id'] :
+        obj = get_object_or_404(DocumentType, id=body['id'])
+        return_dict = obj.delete()
+        return JsonResponse({ 'message': 'Document Type Removed', 'obj': return_dict })
+    else:
+        return JsonResponse({ 'message': 'Document Type Removed'})
+
+
+
+def workflow_update_view(request, *args, **kwargs):
+    try:
+        body = json.loads(request.body)
+    except:
+        body = None
+
+    if body['id'] :
+        obj = get_object_or_404(DocumentType, id=body['id'])
+
+        internalWF = None
+        externalWF = None
+
+        if len(body['internal']) :
+            internalWF = WorkFlowModel(title='internal')
+            internalWF.save()
+
+            for step in body['internal']:
+                s = SigningStep(name=step['name'], authority= get_object_or_404(CustomUser, username=step['authority']))
+                s.save()
+                internalWF.steps.add(s)
+
+        if len(body['external']) :
+            externalWF = WorkFlowModel(title='external')
+            externalWF.save()
+
+            for step in body['external']:
+                s = SigningStep(name=step['name'], authority= get_object_or_404(CustomUser, username=step['authority']))
+                s.save()
+                externalWF.steps.add(s)
+
+        #obj.internal_work_flow.clear()
+        #obj.external_work_flow.clear()
+
+        obj.title = body['title']
+        obj.internal_work_flow = internalWF
+        obj.external_work_flow = externalWF
+        obj.save()
+
+        if obj.internal_work_flow :
+            internalWF = {
+                'title': obj.internal_work_flow.title ,
+                'steps': [{ 'name': step.name, 'authority':step.authority.username} for step in obj.internal_work_flow.steps.all()],
+            }
+
+        if obj.external_work_flow :
+            externalWF = {
+                'title': obj.external_work_flow.title,
+                'steps': [{ 'name': step.name, 'authority':step.authority.username} for step in obj.external_work_flow.steps.all()],
+            }
+
+        return JsonResponse({'id': obj.id, 'title': obj.title, 'internal_work_flow': internalWF, 'external_work_flow': externalWF })
+    else :
+        return JsonResponse({'error': 'Document Type Object not found.'})
+
+
+
+
+
+
 class DocumentCreatedListView(ListView):
 	template_name = 'workflow/created_document_list.html'
 
 	def get_queryset(self, **kwargs):
 		return Document.objects.filter(created_by=self.request.user)
-
-
 
 class DocumentWorkFlowAddView(View):
 	form = DocumentForm()
