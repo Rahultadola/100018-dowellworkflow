@@ -1,10 +1,11 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
+{% load static %}
 {% block title %}
 Add Document{% endblock %}
 
 {% block content %}
-
+<div class="container" style="max-width: 640px;">
 <h1>Add Document</h1>
 
 {% if message %}
@@ -20,7 +21,7 @@ Add Document{% endblock %}
 
     <input type="submit" class="btn btn-outline-success " value="Create">
 </form>
-              
+
               <div class="modal fade" id="addWorkFlowModal" tabindex="-1" role="dialog" aria-labelledby="addWorkFlowModalLabel" aria-hidden="true">
                 <div class="modal-dialog" role="document">
                   <div class="modal-content">
@@ -30,7 +31,7 @@ Add Document{% endblock %}
                         <span aria-hidden="true">&times;</span>
                       </button>
                     </div>
-                    
+
                     <div class="modal-body">
                        <div class="form-group">
                           <div class="row">
@@ -42,7 +43,7 @@ Add Document{% endblock %}
                         </div>
 
                         {% for wf in workflow %}
-                                <div class="mb-3">                 
+                                <div class="mb-3">
                                       <div class="form-group text-center">
                                         <h4 class="text-info">{{ wf|title }} Work Flow</h4>
                                       </div>
@@ -59,7 +60,7 @@ Add Document{% endblock %}
                                           <tbody id="{{wf}}_table">
                                             <td colspan="4" class="text-center">
                                                 No Steps.
-                                            </td>                                           
+                                            </td>
                                           </tbody>
                                         </table>
                                         <div class="form-row" id="step-form">
@@ -83,10 +84,10 @@ Add Document{% endblock %}
                                           </div>
                                         </div>
                                         <small class="text-danger" id="{{wf}}_step_form_error"></small>
-                                                                      
+
                               </div>
                  {% endfor %}
-              
+
               <div class="modal-footer">
                 <a class="btn btn-outline-danger" data-dismiss="modal" id="close-modal">Cancel</a>
                 <a class="btn btn-outline-success" id="addDocumentType">Add Document Type</a>
@@ -95,10 +96,16 @@ Add Document{% endblock %}
             </div>
           </div>
         </div>
-
-
+{% if request.user.is_authenticated %}
+    {{ request.user.is_staff|json_script:"is-staff" }}
+{% endif %}
 <script type="text/javascript">
+    const isStaff = JSON.parse(document.getElementById('is-staff').textContent);
+    const internalWFList = [];
+    const externalWFList = [];
+    var new_entry = true;
 
+    if ( isStaff ) {
         const add_button = document.createElement('a');
 
         add_button.innerHTML = "Add New";
@@ -109,185 +116,15 @@ Add Document{% endblock %}
         add_button.setAttribute("data-toggle", "modal");
         add_button.setAttribute("data-target", "#addWorkFlowModal")
 
-        const divElement = document.createElement('div');
-        divElement.className = "d-flex flex-row justify-content-around mt-3 text-muted rounded";
-        divElement.id = 'workflow-container';
-
         const form = document.getElementById('div_id_document_type');
         form.insertBefore(add_button, form.childNodes[2]);
 
-        form.append(divElement);
 
+    }
 
-        //for workflow form Elements script
-
-        const internalWFList = [];
-        const externalWFList = [];
-
-        const addInternalStep = document.getElementById('add_internal_step');
-        const addExternalStep = document.getElementById('add_external_step');
-
-
-        const createRowInTable = (item, list, table) => {
-            const tr = document.createElement('tr');
-            const th = document.createElement('th');
-            th.setAttribute("scope", "row");
-            th.innerHTML = list.indexOf(item) + 1;
-            const td1 = document.createElement('td');
-            td1.innerHTML = item.name;
-            const td2 = document.createElement('td');
-            td2.innerHTML = item.authority;
-            
-
-            th.setAttribute("class", "text-center");
-            td1.setAttribute("class", "text-center");
-            td2.setAttribute("class", "text-center")
-
-            const rm_link = document.createElement('a');
-            rm_link.className = "btn btn-outline-danger btn-sm rounded-0 remove_btn";
-            rm_link.innerHTML = '';
-
-            const td3 = document.createElement('td');
-            td3.append(rm_link);
-            td3.setAttribute("class", "text-center")
-
-            tr.append(th)
-            tr.append(td1)
-            tr.append(td2);
-            tr.append(td3)
-            table.append(tr);
-          }
-
-        function submit_step(list, type=""){
-            document.getElementById( type + '_step_form_error' ).innerHTML = '';
-            document.getElementById( type + 'StepName').style.borderColor = 'initial';
-            document.getElementById(type + 'authorityID').style.borderColor = 'initial';
-
-            const stepObj = {
-                name: document.getElementById( type + 'StepName').value,
-                authority: document.getElementById(type + 'authorityID').value
-            }
-
-            document.getElementById( type + 'StepName').value = ''
-            document.getElementById(type + 'authorityID').value = "None"
-
-            if((stepObj.name === '') || (stepObj.authority === "None")){
-                document.getElementById( type + '_step_form_error' ).innerHTML = 'Both fields are required.';
-                document.getElementById( type + 'StepName').style.borderColor = '#d00';
-                document.getElementById(type + 'authorityID').style.borderColor = '#d00';
-
-            } else {
-                
-                let found =  list.find(item => (item.name === stepObj.name) && (item.authority === stepObj.authority)
-                );
-
-                if (found === undefined ){
-                    list.push(stepObj);
-                    const listElement = document.getElementById(type + '_table');
-                    listElement.innerHTML = ''
-
-                    list.map((item, index, list) => createRowInTable(item, list, listElement));  
-                } else {
-
-                  document.getElementById( type + '_step_form_error' ).innerHTML = 'Already added.'
-
-                }
-
-            }
-
-            function addListenerAfterRemove(){
-              document.querySelectorAll('.remove_btn').forEach(item => {
-                item.addEventListener('click', event => {
-                                 
-
-                  let found =  list.find(item => (item.name === event.target.parentNode.parentNode.childNodes[1].innerHTML) && (item.authority === event.target.parentNode.parentNode.childNodes[2].innerHTML)
-                  );
-                 
-                  const removedElement = list.splice(list.indexOf(found), 1);
-                  const listElement = document.getElementById(type + '_table');
-                  listElement.innerHTML = '';
-
-                  if ( list.length === 0 ){
-                    const td = document.createElement('td');
-                    td.setAttribute("colspan", 4);
-                    td.className = "text-center";
-                    td.innerHTML = "No Steps";
-                    listElement.append(td);
-                  } else {
-                    list.map((item, index, list) => createRowInTable(item, list, listElement));
-                    addListenerAfterRemove();
-                  }                 
-                })
-              });              
-            }
-
-            addListenerAfterRemove();                  
-                      
-        }
-
-        const disableButton = (btn) => {  btn.disabled = true;   btn.style.opacity = '0.5'; };
-        const enableButton = (btn) => {  btn.disabled = false;   btn.style.opacity = '1';   };
-
-        addInternalStep.onclick = function(e){
-          disableButton(addInternalStep);
-          submit_step( internalWFList, type="internal");
-          enableButton(addInternalStep) ;
-        } 
-        addExternalStep.onclick = function(e){
-          disableButton(addInternalStep);
-          submit_step(externalWFList, type="external");
-          enableButton(addInternalStep);  
-        } 
-
-
-        
-        // submit button on Document Type form
-        const addDocumentType = document.getElementById('addDocumentType');
-        addDocumentType.onclick = function(e){
-          document.getElementById('documentType-title').style.borderColor = 'initial';
-
-          if(!document.getElementById('documentType-title').value){
-            document.getElementById('docTypeFieldError').innerHTML = "This field is required.";
-            document.getElementById('documentType-title').style.borderColor = "#d00";
-            //if document title is empty.
-          } else {
-            const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-
-
-            const createDocumentTypeRequest = new Request('/workflow/create-document-type/', {headers: {'X-CSRFToken': csrftoken}} );
-
-            requestBody = {
-              title: document.getElementById('documentType-title').value,
-              internal: internalWFList,
-              external: externalWFList
-            }
-
-            document.getElementById('documentType-title').value = '';
-
-            fetch(createDocumentTypeRequest, {
-                method: 'POST',
-                mode: 'same-origin',
-                body: JSON.stringify(requestBody)
-            }).then(async function(response) {
-                const documentTypeObject = await response.json();
-
-                document.getElementById('close-modal').click();
-                
-                const option = document.createElement('option');
-                option.setAttribute('value', documentTypeObject.id);
-                option.innerHTML = documentTypeObject.title;
-
-                const selectField = document.getElementById('id_document_type');
-                selectField.append(option);
-                selectField.value = option.value;
-
-                selectField.onchange()
-
-            });
-
-          }
-        }
 
 </script>
 
+<script type="text/javascript" src="{% static 'js/add_document_type.js' %}"></script>
+</div>
 {% endblock %}
